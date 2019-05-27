@@ -3,20 +3,26 @@
 
 import sys
 sys.path = ['/home/pi/Downloads/inference_engine_vpu_arm/python/python2.7'] + sys.path
-print('Python version: ' + sys.version)
-
 import cv2
-print('CV version: ' + cv2.__version__)
 
 import rospy
-#from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from pose_estimation_msgs.msg import *
+
+import human_pose_estimation_functions
 import numpy as np
 import time
 import human_pose_estimation_functions
 
-from pose_estimation_msgs.msg import *
+import argparse
+
+############################################
+############ HANDLE ARGS ###################
+############################################
+parser = argparse.ArgumentParser()
+parser.add_argument('--network', type=int, help='Select Network for Human Pose Estimation, 1=fastNN, 2=openPoseSingle, 3=openPoseMulti')
+
 
 
 ############################################
@@ -24,17 +30,17 @@ from pose_estimation_msgs.msg import *
 ############################################
 #https://www.learnopencv.com/deep-learning-based-human-pose-estimation-using-opencv-cpp-python/
 #COCO Output Format
-BODY_PARTS = { "Nose": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
-               "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
-               "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13, "REye": 14,
-               "LEye": 15, "REar": 16, "LEar": 17, "Background": 18 }
+#BODY_PARTS = { "Nose": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
+#               "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
+#               "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13, "REye": 14,
+#               "LEye": 15, "REar": 16, "LEar": 17, "Background": 18 }
 
 
-POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbow"],
-               ["RElbow", "RWrist"], ["LShoulder", "LElbow"], ["LElbow", "LWrist"],
-               ["Neck", "RHip"], ["RHip", "RKnee"], ["RKnee", "RAnkle"], ["Neck", "LHip"],
-               ["LHip", "LKnee"], ["LKnee", "LAnkle"], ["Neck", "Nose"], ["Nose", "REye"],
-               ["REye", "REar"], ["Nose", "LEye"], ["LEye", "LEar"] ]
+#POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbow"],
+#               ["RElbow", "RWrist"], ["LShoulder", "LElbow"], ["LElbow", "LWrist"],
+#               ["Neck", "RHip"], ["RHip", "RKnee"], ["RKnee", "RAnkle"], ["Neck", "LHip"],
+#               ["LHip", "LKnee"], ["LKnee", "LAnkle"], ["Neck", "Nose"], ["Nose", "REye"],
+#               ["REye", "REar"], ["Nose", "LEye"], ["LEye", "LEar"] ]
 
 
 #MPII Output Format
@@ -49,14 +55,14 @@ POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElb
 #               ["LHip", "LKnee"], ["LKnee", "LAnkle"], ["Neck", "Head"] ]
 
 ##for fast eva                  
-#BODY_PARTS = { "Head": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
-#               "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
-#               "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13}
+BODY_PARTS = { "Head": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
+               "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
+               "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13}
 
-#POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbow"],
-#               ["RElbow", "RWrist"], ["LShoulder", "LElbow"], ["LElbow", "LWrist"],
-#               ["Neck", "RHip"], ["RHip", "RKnee"], ["RKnee", "RAnkle"], ["Neck", "LHip"],
-#               ["LHip", "LKnee"], ["LKnee", "LAnkle"], ["Neck", "Head"] ]
+POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElbow"],
+               ["RElbow", "RWrist"], ["LShoulder", "LElbow"], ["LElbow", "LWrist"],
+               ["Neck", "RHip"], ["RHip", "RKnee"], ["RKnee", "RAnkle"], ["Neck", "LHip"],
+               ["LHip", "LKnee"], ["LKnee", "LAnkle"], ["Neck", "Head"] ]
 
            
 # COCO Output Format
@@ -88,9 +94,10 @@ colors = [ [0,100,255], [0,100,255], [0,255,255], [0,100,255], [0,255,255], [0,1
 net = cv2.dnn.readNet('/home/pi/catkin_ws/src/pose_estimation/src/networks/human-pose-estimation-0001.xml','/home/pi/catkin_ws/src/pose_estimation/src/networks/human-pose-estimation-0001.bin')
 #net = cv2.dnn.readNet('/home/pi/catkin_ws/src/pose_estimation/src/networks/model.xml','/home/pi/catkin_ws/src/pose_estimation/src/networks/model.bin')
 
-#?
+#Set device to Neural Compute Stick
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
 
+#init CV Bridge 
 bridge = CvBridge()
 
 #Create Ros publisher
@@ -155,8 +162,8 @@ def processPoseSingle(frame, output):
 			cv2.ellipse(frame, points[idFrom], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
 			cv2.ellipse(frame, points[idTo], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
 
-	#cv2.imshow('image',frame[...,::-1])
-	#cv2.waitKey(1)
+	cv2.imshow('image',frame)
+	cv2.waitKey(1)
 
 def processPoseMulti(frame, output):
 	#MULTI PERSON 
@@ -224,16 +231,20 @@ def processPoseMulti(frame, output):
 
 	cv2.imshow("Detected Pose" , frameClone)
 	cv2.waitKey(1)
+		
 
 def callback(data):
 	#print("Message received")
 	frame = bridge.imgmsg_to_cv2(data, desired_encoding="passthrough")
 
+	#cv2.imshow('Feed', frame)
+	#cv2.waitKey(1)
+	print("Test")
 	#feed neural network and process
 	#size for openpose network
-	blob = cv2.dnn.blobFromImage(frame, size=(456, 256), ddepth=cv2.CV_8U)
+	#blob = cv2.dnn.blobFromImage(frame, size=(456, 256), ddepth=cv2.CV_8U)
 	#size for fast network
-	#blob = cv2.dnn.blobFromImage(frame, size=(192, 192), ddepth=cv2.CV_8U)
+	blob = cv2.dnn.blobFromImage(frame, size=(192, 192), ddepth=cv2.CV_8U)
 	net.setInput(blob)
 
 	#single pose estimation
@@ -259,7 +270,49 @@ def callback(data):
 def main():
 	print('Started listening')
 	rospy.init_node('pose_estimation')
-	sub = rospy.Subscriber("/camera/image_raw", Image, callback)
+	#sub = rospy.Subscriber("/camera/image_raw", Image, callback)
+	cap = cv2.VideoCapture('udpsrc port=3000 ! application/x-rtp, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+	#i guess this command does not work :(, buffer is still 5 
+	cap.set(cv2.CAP_PROP_BUFFERSIZE, 0);
+	if not cap.isOpened():
+		print('VideoCapture not opened')
+		exit(0)
+
+	print('VideoCapture opened')
+
+	while True:
+		startTime = time.time()
+		#default buffer size is 5, so empty buffer every time
+		for i in xrange(1):
+			cap.grab()
+			
+		ret,frame = cap.read()
+		
+		if not ret:
+			print('empty frame')
+			break
+
+		#cv2.imshow('receive', frame)
+		#if cv2.waitKey(1)&0xFF == ord('q'):
+		#	break
+			
+		#startTime = time.time()
+		
+		#blob = cv2.dnn.blobFromImage(frame, size=(192, 192), ddepth=cv2.CV_8U)
+		blob = cv2.dnn.blobFromImage(frame, size=(456, 256), ddepth=cv2.CV_8U)
+		net.setInput(blob)
+		out = net.forward()
+		#midTime = time.time()
+		
+		#processPoseSingle(frame, out)
+		endTime = time.time()
+		
+		#print(midTime - startTime)
+		print(endTime - startTime)
+		print('\n')
+		
+		
+	cap.release()
 	rospy.spin()
 
 
