@@ -271,7 +271,7 @@ def main():
 	print('Started listening')
 	rospy.init_node('pose_estimation')
 	#sub = rospy.Subscriber("/camera/image_raw", Image, callback)
-	cap = cv2.VideoCapture('udpsrc port=3000 ! application/x-rtp, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+	cap = cv2.VideoCapture('updsrc port=3000 ! application/x-rtp, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! appsink', cv2.CAP_GSTREAMER)
 	#i guess this command does not work :(, buffer is still 5 
 	cap.set(cv2.CAP_PROP_BUFFERSIZE, 0);
 	if not cap.isOpened():

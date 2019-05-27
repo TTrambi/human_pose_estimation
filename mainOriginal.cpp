@@ -64,6 +64,7 @@ int main(int argc, char* argv[]) {
         if (!cap.read(image)) {
             throw std::logic_error("Failed to get frame from cv::VideoCapture");
         }
+        
         estimator.estimate(image);  // Do not measure network reshape, if it happened
         do {
             double t1 = cv::getTickCount();

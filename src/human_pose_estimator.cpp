@@ -58,26 +58,34 @@ HumanPoseEstimator::HumanPoseEstimator(const std::string& modelPath,
 
 std::vector<HumanPose> HumanPoseEstimator::estimate(const cv::Mat& image) {
     CV_Assert(image.type() == CV_8UC3);
-
+    std::cout << "Test1" << std::endl;
     cv::Size imageSize = image.size();
-    if (inputWidthIsChanged(imageSize)) {
+    std::cout << "Test2" << std::endl;
+    /*if (inputWidthIsChanged(imageSize)) {
         auto input_shapes = network.getInputShapes();
+        std::cout << "Test3" << std::endl;
         std::string input_name;
         InferenceEngine::SizeVector input_shape;
+        std::cout << "Test4" << std::endl;
         std::tie(input_name, input_shape) = *input_shapes.begin();
+        std::cout << "Test5" << std::endl;
         input_shape[2] = inputLayerSize.height;
         input_shape[3] = inputLayerSize.width;
         input_shapes[input_name] = input_shape;
+        std::cout << "Test6" << std::endl;
         network.reshape(input_shapes);
+        std::cout << "Test7" << std::endl;
         executableNetwork = plugin.LoadNetwork(network, {});
         request = executableNetwork.CreateInferRequest();
-    }
+    }*/
     InferenceEngine::Blob::Ptr input = request.GetBlob(network.getInputsInfo().begin()->first);
     auto buffer = input->buffer().as<InferenceEngine::PrecisionTrait<InferenceEngine::Precision::FP32>::value_type *>();
+    std::cout << "Test8" << std::endl;
     preprocess(image, static_cast<float*>(buffer));
-
+    std::cout << "Test9" << std::endl;
     request.Infer();
-
+    std::cout << "Test10" << std::endl;
+    
     InferenceEngine::Blob::Ptr pafsBlob = request.GetBlob(pafsBlobName);
     InferenceEngine::Blob::Ptr heatMapsBlob = request.GetBlob(heatmapsBlobName);
     CV_Assert(heatMapsBlob->getTensorDesc().getDims()[1] == keypointsNumber + 1);
