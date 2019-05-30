@@ -113,10 +113,8 @@ else:
 try:
 	#read network via opencv
 	net = cv2.dnn.readNet(modelXMLPath,modelBinPath)
-
 	#Set device to Neural Compute Stick
 	net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
-	
 	#init CV Bridge 
 	bridge = CvBridge()
 except:
@@ -126,13 +124,11 @@ except:
 #Create Ros publisher
 pub = rospy.Publisher('/pose_estimation', Persons, queue_size=1)
 
-
 ############################################
 ##### Processing Human Pose Functions ######
 ############################################
 
 #Process network output
-
 def processPoseSingle(frame, output):
 	#SINGLE PERSON 
 	# #source: https://github.com/quanhua92/human-pose-estimation-opencv/blob/master/openpose.py#L57
@@ -257,18 +253,16 @@ def processPoseMulti(frame, output):
 	cv2.waitKey(1)
 		
 
-
 ############################################
 ########### Essential Fuinction ############
 ############################################
 def callback(data):
 	frame = bridge.imgmsg_to_cv2(data, desired_encoding="passthrough")
 
+	frame = frame[...,::-1]
 	#feed neural network and process
 	blob = cv2.dnn.blobFromImage(frame, size=(192, 192), ddepth=cv2.CV_8U)
 	net.setInput(blob)
-
-	#single pose estimation
 	out = net.forward()
 
 	#multi-person pose estimation with openpose network
@@ -280,8 +274,7 @@ def callback(data):
 	#for i  in range(out[0].shape[1]):
 	#	output[:,i+out[1].shape[1],:,:] = out[0][:,i,:,:]
 	
-	
-	#extract the pose from the neural network output, single or multi person pose estimation
+	#extract the pose from the neural network output
 	processPoseSingle(frame, out)
 
 
@@ -289,13 +282,14 @@ def main():
 	print('Started listening')
 	rospy.init_node('pose_estimation')
 	if args.input != None:
-		print("Subscribing to %s", args.input)
-		sub = rospy.Subscriber(args.input, Image, callback)
+		print("Subscribing to " + args.input)
+		sub = rospy.Subscriber(args.input, Image, callback, queue_size=1)
+		rospy.spin()
 	else:
 		print("Using opencv and gstreamer, udpsrc port=3000")
 		cap = cv2.VideoCapture('udpsrc port=3000 ! application/x-rtp, encoding-name=JPEG,payload=26 ! rtpjpegdepay ! jpegdec ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 		#i guess this command does not work :(, buffer is still 5 
-		#cap.set(cv2.CAP_PROP_BUFFERSIZE, 0);
+		cap.set(cv2.CAP_PROP_BUFFERSIZE, 0);
 		if not cap.isOpened():
 			print('OpenCV VideoCapture not opened')
 			exit(0)
@@ -304,23 +298,18 @@ def main():
 			#default buffer size is 5, so empty buffer every time
 			for i in xrange(1):
 				cap.grab()
-			
+				
 			ret,frame = cap.read()
-		
+
 			if not ret:
 				print('empty frame')
 				break
 		
 			blob = cv2.dnn.blobFromImage(frame, size=(192, 192), ddepth=cv2.CV_8U)
-			#blob = cv2.dnn.blobFromImage(frame, size=(456, 256), ddepth=cv2.CV_8U)
 			net.setInput(blob)
 			out = net.forward()
-		
 			processPoseSingle(frame, out)
 		cap.release()
-		
-	rospy.spin()
-
 
 if __name__ == '__main__':
     print "Running"
