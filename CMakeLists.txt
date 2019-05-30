@@ -7,6 +7,19 @@ if (NOT InferenceEngine_FOUND)
     message(FATAL_ERROR "")
 endif()
 
+find_package(OpenCV 4.0.1)
+if (NOT OpenCV_FOUND)
+    message(FATAL_ERROR "")
+endif()
+
+if (NOT(IE_MAIN_SOURCE_DIR))
+    # in case if samples are built out of IE repo
+    set (IE_MAIN_SAMPLES_DIR ${CMAKE_CURRENT_BINARY_DIR})
+else()
+    # in case if samples are built from IE repo
+    set (IE_MAIN_SAMPLES_DIR ${IE_MAIN_SOURCE_DIR})
+endif()
+
 #set(OpenCV_DIR $ENV{OpenCV_DIR})
 
 #set(OpenCV_INCLUDE_DIRS
@@ -140,17 +153,25 @@ catkin_package(
 ## Build ##
 ###########
 set(TARGET_NAME "${PROJECT_NAME}_node")
+set (GFLAGS_IS_SUBPROJECT TRUE)
+set (HAVE_SYS_STAT_H 1)
+set (HAVE_INTTYPES_H 1)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
   include ${catkin_INCLUDE_DIRS}
   ${InferenceEngine_INCLUDE_DIRS}
-  ${InferenceEngine_INCLUDE_DIRS}/../samples
-  ${InferenceEngine_DIR}/../src
-  include /home/pi/Downloads/inference_engine_vpu_arm/inference_engine/samples/common/samples
+  #${InferenceEngine_INCLUDE_DIRS}/../samples
+  #${InferenceEngine_DIR}/../src
+  #include /home/pi/Downloads/inference_engine_vpu_arm/inference_engine/samples/common/samples
   ${OpenCV_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/format_reader  
+  ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/gflags/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
+add_subdirectory(thirdparty/gflags)
+add_subdirectory(common/format_reader)
 
 ## Declare a C++ library
 #add_library(${PROJECT_NAME}
@@ -199,6 +220,7 @@ target_link_libraries(${TARGET_NAME}
   ${catkin_LIBRARIES}
   ${InferenceEngine_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  gflags
 )
 
 #############

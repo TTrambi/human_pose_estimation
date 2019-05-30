@@ -8,71 +8,88 @@
 * \example human_pose_estimation_demo/main.cpp
 */
 
-#include "ros/ros.h"
-
 #include <vector>
 
 #include <inference_engine.hpp>
 
-//#include <samples/ocv_common.hpp>
+#include <samples/ocv_common.hpp>
 
-//#include "human_pose_estimation_demo.hpp"
+#include "human_pose_estimation_demo.hpp"
 #include "human_pose_estimator.hpp"
 #include "render_human_pose.hpp"
-
-#include "opencv2/opencv.hpp"
-
-#include "pose_estimation_msgs/Persons.h"
-#include "pose_estimation_msgs/PersonDetection.h"
-#include "pose_estimation_msgs/BodyPartDetection.h"
 
 using namespace InferenceEngine;
 using namespace human_pose_estimation;
 
+bool ParseAndCheckCommandLine(int argc, char* argv[]) {
+    // ---------------------------Parsing and validation of input args--------------------------------------
+
+    gflags::ParseCommandLineNonHelpFlags(&argc, &argv, true);
+    if (FLAGS_h) {
+        showUsage();
+        return false;
+    }
+
+    std::cout << "[ INFO ] Parsing input parameters" << std::endl;
+
+    if (FLAGS_i.empty()) {
+        throw std::logic_error("Parameter -i is not set");
+    }
+
+    if (FLAGS_m.empty()) {
+        throw std::logic_error("Parameter -m is not set");
+    }
+
+    return true;
+}
 
 int main(int argc, char* argv[]) {
     try {
         std::cout << "InferenceEngine: " << GetInferenceEngineVersion() << std::endl;
 
-	ros::init(argc, argv, "pose_estimation_cpp");
-	ros::NodeHandle n;
-        ros::Publisher pose_pub = n.advertise<pose_estimation_msgs::Persons>("human_pose_estimation", 1);
-	
-	HumanPoseEstimator estimator("/home/pi/catkin_ws/src/pose_estimation/src/networks/human-pose-estimation-0001.xml","MYRIAD");
-	
-	//std::cout << cv::getBuildInformation() << std::endl;
-	cv::VideoCapture cap("udpsrc port=3000 ! application/x-rtp, encoding-name=JPEG, payload=26 ! rtpjpegdepay ! jpegdec ! videoconvert ! appsink", cv::CAP_GSTREAMER);
-	std::cout << "Test1" << std::endl;
-	if (!cap.isOpened()) {
-            throw std::logic_error("Cannot open input stream");
+        // ------------------------------ Parsing and validation of input args ---------------------------------
+        if (!ParseAndCheckCommandLine(argc, argv)) {
+            return EXIT_SUCCESS;
         }
-	
-	/*	
-	int delay = 33;
+
+        HumanPoseEstimator estimator(FLAGS_m, FLAGS_d, FLAGS_pc);
+        cv::VideoCapture cap;
+        if (!(FLAGS_i == "cam" ? cap.open(0) : cap.open(FLAGS_i))) {
+            throw std::logic_error("Cannot open input file or camera: " + FLAGS_i);
+        }
+
+        int delay = 33;
         double inferenceTime = 0.0;
         cv::Mat image;
         if (!cap.read(image)) {
             throw std::logic_error("Failed to get frame from cv::VideoCapture");
         }
-        estimator.estimate(image);
-	std::cout << "Test1" << std::endl;
-	cap.read(image);
-	std::cout << "Test2" << std::endl;
-	std::vector<HumanPose> poses = estimator.estimate(image);
-	std::cout << "Test2" << std::endl;
-	
-	do{
-	    double t1 = cv::getTickCount();
-	    std::cout << "Test4" << std::endl;
+        estimator.estimate(image);  // Do not measure network reshape, if it happened
+        do {
+            double t1 = cv::getTickCount();
             std::vector<HumanPose> poses = estimator.estimate(image);
-	    std::cout << "Test5" << std::endl;
             double t2 = cv::getTickCount();
             if (inferenceTime == 0) {
                 inferenceTime = (t2 - t1) / cv::getTickFrequency() * 1000;
             } else {
                 inferenceTime = inferenceTime * 0.95 + 0.05 * (t2 - t1) / cv::getTickFrequency() * 1000;
             }
-            
+            if (FLAGS_r) {
+                for (HumanPose const& pose : poses) {
+                    std::stringstream rawPose;
+                    rawPose << std::fixed << std::setprecision(0);
+                    for (auto const& keypoint : pose.keypoints) {
+                        rawPose << keypoint.x << "," << keypoint.y << " ";
+                    }
+                    rawPose << pose.score;
+                    std::cout << rawPose.str() << std::endl;
+                }
+            }
+
+            if (FLAGS_no_show) {
+                continue;
+            }
+
             renderHumanPose(poses, image);
 
             cv::Mat fpsPane(35, 155, CV_8UC3);
@@ -84,49 +101,15 @@ int main(int argc, char* argv[]) {
             cv::putText(image, fpsSs.str(), cv::Point(16, 32),
                         cv::FONT_HERSHEY_COMPLEX, 0.8, cv::Scalar(0, 0, 255));
             cv::imshow("ICV Human Pose Estimation", image);
-	    int key = cv::waitKey(delay) & 255;
+
+            int key = cv::waitKey(delay) & 255;
             if (key == 'p') {
                 delay = (delay == 0) ? 33 : 0;
             } else if (key == 27) {
                 break;
             }
-	}while(cap.read(image));
-	*/
-	
-	cv::Mat image;
-	cv::Mat testImg = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-	while(ros::ok()){
-	    //get image from gstreamer via opencv
-	    cap.read(image);
-	    if (image.empty()){
-		std::cout << "Frame empty!" << std::endl;
-		break;
-	    }
-	    cv::imshow("Image", image);
-	    cv::waitKey(1);
-	    
-	    std::vector<HumanPose> poses = estimator.estimate(testImg);
-	    
-	    //std::cout << "Test1" << std::endl;
-	    //std::vector<HumanPose> poses = estimator.estimate(image);
-	    //std::cout << "Test2" << std::endl;
-	    //get pose from Human Pose Estimator
-	    //std::cout << "Test2" << std::endl;
-	    //std::vector<HumanPose> poses = estimator.estimate(frame);
-	    //std::cout << "Test3" << std::endl;
-	    //renderHumanPose(poses, frame);
-	    //publish human pose 
-	}
-	
-    
-  
-	//get image from gstreamer
-	//cv::Mat image;
-	
-        //int delay = 33;
-        //double inferenceTime = 0.0;
-	//std::vector<HumanPose> poses = estimator.estimate(image);
-        }
+        } while (cap.read(image));
+    }
     catch (const std::exception& error) {
         std::cerr << "[ ERROR ] " << error.what() << std::endl;
         return EXIT_FAILURE;
